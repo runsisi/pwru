@@ -476,6 +476,10 @@ set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 	if (v->len < 0) {
 		return;
 	}
+	if (v->len >= PRINT_SHINFO_STR_SIZE) {
+        v->len = PRINT_SHINFO_STR_SIZE - 1;
+        v->str[v->len] = '\0';
+    }
 
 	bpf_map_update_elem(&print_shinfo_map, event_id, v, BPF_ANY);
 }

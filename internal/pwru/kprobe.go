@@ -214,7 +214,25 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 	pwruKprobes := make([]Kprobe, 0, len(funcs))
 	funcsByPos := GetFuncsByPos(funcs)
 	for pos, fns := range funcsByPos {
+		if pos&0x80 != 0 {
+			continue
+		}
+
 		fn, ok := coll.Programs[fmt.Sprintf("%s_skb_%d", probeMethod, pos)]
+		if ok {
+			pwruKprobes = append(pwruKprobes, Kprobe{HookFuncs: fns, Prog: fn})
+		} else {
+			ignored += len(fns)
+			bar.Add(len(fns))
+		}
+	}
+
+	for pos, fns := range funcsByPos {
+		if pos&0x80 == 0 {
+			continue
+		}
+
+		fn, ok := coll.Programs[fmt.Sprintf("%s_pskb_%d", probeMethod, pos&0x7f)]
 		if ok {
 			pwruKprobes = append(pwruKprobes, Kprobe{HookFuncs: fns, Prog: fn})
 		} else {

@@ -6,12 +6,16 @@ package pwru
 
 import (
 	"bufio"
+	"cmp"
+	"errors"
 	"fmt"
 	"iter"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
@@ -43,7 +47,84 @@ func getAvailableFilterFunctions() (map[string]struct{}, error) {
 	return availableFuncs, nil
 }
 
-func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) (Funcs, error) {
+func sortCompact[S ~[]E, E cmp.Ordered](x S) S {
+	slices.Sort(x)
+	return slices.Compact(x)
+}
+
+func fileExists(filepath string) bool {
+	stat, err := os.Stat(filepath)
+	return err == nil && !stat.IsDir()
+}
+
+func LoadKmodBtfs(kmods []string, kmodBTFDir string) (map[string]*btf.Spec, error) {
+	if kmodBTFDir == "" {
+		return nil, nil
+	}
+
+	btfs := map[string]*btf.Spec{}
+	if len(kmods) != 0 {
+		kmods = sortCompact(kmods)
+		if idx := slices.Index(kmods, "vmlinux"); idx != -1 {
+			kmods = slices.Delete(kmods, idx, idx+1)
+		}
+
+		btfs = make(map[string]*btf.Spec, len(kmods))
+		for _, kmod := range kmods {
+			btfPath := filepath.Join(kmodBTFDir, kmod+".btf")
+			if !fileExists(btfPath) {
+				return nil, fmt.Errorf("split BTF file %s does not exist", btfPath)
+			}
+
+			kmodBtf, err := btf.LoadSpec(btfPath)
+			if err != nil {
+				if errors.Is(err, btf.ErrNotFound) {
+					log.Printf("split BTF not found for %s", btfPath)
+					continue
+				}
+				return nil, fmt.Errorf("failed to load %s: %w", btfPath, err)
+			}
+
+			btfs[kmod] = kmodBtf
+		}
+	} else {
+		files, err := os.ReadDir(kmodBTFDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read /sys/kernel/btf: %w", err)
+		}
+
+		fileNames := make([]string, 0, len(files))
+		for _, file := range files {
+			if file.IsDir() || file.Name() == "vmlinux" {
+				continue // skip directories and vmlinux
+			}
+			if !strings.HasSuffix(file.Name(), ".btf") {
+				continue
+			}
+			fileNames = append(fileNames, file.Name())
+		}
+
+		btfs = make(map[string]*btf.Spec, len(fileNames))
+		for _, fileName := range fileNames {
+			btfPath := filepath.Join(kmodBTFDir, fileName)
+
+			kmodBtf, err := btf.LoadSpec(btfPath)
+			if err != nil {
+				if errors.Is(err, btf.ErrNotFound) {
+					log.Printf("BTF not found for %s", btfPath)
+					continue
+				}
+				return nil, fmt.Errorf("failed to load %s BTF: %w", btfPath, err)
+			}
+
+			btfs[strings.TrimSuffix(fileName, ".btf")] = kmodBtf
+		}
+	}
+
+	return btfs, nil
+}
+
+func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kmodBTFDir string, kprobeMulti bool) (Funcs, error) {
 	funcs := Funcs{}
 
 	type iterator struct {
@@ -67,6 +148,9 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		path := filepath.Join("/sys/kernel/btf", module)
 		f, err := os.Open(path)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) && kmodBTFDir != "" {
+				continue
+			}
 			return nil, fmt.Errorf("failed to open %s: %v", path, err)
 		}
 		defer f.Close()
@@ -76,6 +160,14 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 			return nil, fmt.Errorf("failed to load %s btf: %v", module, err)
 		}
 		iters = append(iters, iterator{module, modSpec.All()})
+	}
+
+	kmodBtfs, err := LoadKmodBtfs(kmods, kmodBTFDir)
+	if err != nil {
+		return nil, err
+	}
+	for kmod, kmodBtf := range kmodBtfs {
+		iters = append(iters, iterator{kmod, kmodBtf.All()})
 	}
 
 	for _, it := range iters {

@@ -24,7 +24,8 @@ type Flags struct {
 	ShowVersion bool
 	ShowHelp    bool
 
-	KernelBTF string
+	KModBTFDir string
+	KernelBTF  string
 
 	FilterNetns             string
 	FilterMark              uint32
@@ -74,6 +75,7 @@ type Flags struct {
 func (f *Flags) SetFlags() {
 	flag.BoolVarP(&f.ShowHelp, "help", "h", false, "display this message and exit")
 	flag.BoolVar(&f.ShowVersion, "version", false, "show pwru version and exit")
+	flag.StringVar(&f.KModBTFDir, "kmod-btf-dir", "", "specific directory to search non-split BTF files for kernel modules")
 	flag.StringVar(&f.KernelBTF, "kernel-btf", "", "specify kernel BTF file")
 	flag.StringSliceVar(&f.KMods, "kmods", nil, "list of kernel modules names to attach to")
 	flag.BoolVar(&f.AllKMods, "all-kmods", false, "attach to all available kernel modules")

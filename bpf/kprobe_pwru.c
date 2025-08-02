@@ -693,6 +693,31 @@ PWRU_ADD_KPROBE(5)
 
 #undef PWRU_ADD_KPROBE
 
+#define PWRU_ADD_KPROBE2(X)							\
+SEC("kprobe/pskb-" #X)								\
+	int kprobe_pskb_##X(struct pt_regs *ctx) {				\
+		struct sk_buff **pskb = (struct sk_buff **) PT_REGS_PARM##X(ctx);	\
+		struct sk_buff *skb;						\
+		bpf_probe_read(&skb, sizeof(skb), pskb);	\
+		return kprobe_skb(skb, ctx, NULL, false);		\
+	}									\
+										\
+	SEC("kprobe.multi/pskb-" #X)						\
+	int kprobe_multi_pskb_##X(struct pt_regs *ctx) {				\
+		struct sk_buff **pskb = (struct sk_buff **) PT_REGS_PARM##X(ctx);	\
+		struct sk_buff *skb;						\
+		bpf_probe_read(&skb, sizeof(skb), pskb);	\
+		return kprobe_skb(skb, ctx, NULL, true);			\
+	}
+
+PWRU_ADD_KPROBE2(1)
+PWRU_ADD_KPROBE2(2)
+PWRU_ADD_KPROBE2(3)
+PWRU_ADD_KPROBE2(4)
+PWRU_ADD_KPROBE2(5)
+
+#undef PWRU_ADD_KPROBE2
+
 SEC("kprobe/skb_by_stackid")
 int kprobe_skb_by_stackid(struct pt_regs *ctx) {
 	u64 stackid = get_stackid(ctx, true);

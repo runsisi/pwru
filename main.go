@@ -123,10 +123,12 @@ func main() {
 	if useKprobeMulti {
 		for i := 1; i <= 5; i++ {
 			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_skb_%d", i))
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_pskb_%d", i))
 		}
 	} else {
 		for i := 1; i <= 5; i++ {
 			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_multi_skb_%d", i))
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_multi_pskb_%d", i))
 		}
 	}
 

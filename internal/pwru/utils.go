@@ -23,7 +23,7 @@ import (
 	"github.com/cilium/ebpf/link"
 )
 
-type Funcs map[string]int
+type Funcs map[string]uint8
 
 // getAvailableFilterFunctions return list of functions to which it is possible
 // to attach kprobes.
@@ -211,8 +211,32 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kmodBTFDir string,
 							if kprobeMulti && it.kmod != "" {
 								name = fmt.Sprintf("%s[%s]", fnName, it.kmod)
 							}
-							funcs[name] = i
+							funcs[name] = uint8(i)
 							continue
+						}
+					}
+				}
+				i += 1
+			}
+
+			i = 1
+			for _, p := range fnProto.Params {
+				if ptr, ok := p.Type.(*btf.Pointer); ok {
+					if p, ok := ptr.Target.(*btf.Pointer); ok {
+						if strct, ok := p.Target.(*btf.Struct); ok {
+							if strct.Name == "sk_buff" && i <= 5 {
+								name := fnName
+								if kprobeMulti && it.kmod != "" {
+									name = fmt.Sprintf("%s[%s]", fnName, it.kmod)
+								}
+
+								if _, ok := funcs[name]; ok {
+									continue
+								}
+
+								funcs[name] = uint8(i) | 0x80
+								continue
+							}
 						}
 					}
 				}
@@ -227,7 +251,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kmodBTFDir string,
 func GetFuncsByPos(funcs Funcs) map[int][]string {
 	ret := make(map[int][]string, len(funcs))
 	for fn, pos := range funcs {
-		ret[pos] = append(ret[pos], fn)
+		ret[int(pos)] = append(ret[int(pos)], fn)
 	}
 	return ret
 }

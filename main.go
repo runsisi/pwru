@@ -98,7 +98,7 @@ func main() {
 		useKprobeMulti = true
 	}
 
-	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti)
+	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, flags.KModBTFDir, useKprobeMulti)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
@@ -107,7 +107,7 @@ func main() {
 	}
 	// If --filter-trace-tc/--filter-trace-xdp, it's to retrieve and print bpf
 	// prog's name.
-	addr2name, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
+	addr2name, err := pwru.ParseKallsyms(funcs, flags.OutputStack || flags.KModBTFDir != "" ||
 		len(flags.KMods) != 0 || flags.FilterTraceTc || flags.FilterTraceXdp ||
 		len(flags.FilterNonSkbFuncs) > 0 || flags.OutputCaller || flags.FilterTrackBpfHelpers)
 	if err != nil {

@@ -295,9 +295,10 @@ func getTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
 		l4Info = protoToStr(tpl.L4Proto)
 	}
 
-	tupleData = fmt.Sprintf("%s:%d->%s:%d(%s)",
-		addrToStr(tpl.L3Proto, tpl.Saddr), byteorder.NetworkToHost16(tpl.Sport),
-		addrToStr(tpl.L3Proto, tpl.Daddr), byteorder.NetworkToHost16(tpl.Dport),
+	formatter := fmt.Sprintf(" %%-%ds %%-%ds(%%s)", len("255.255.255.255:65535"), len("255.255.255.255:65535"))
+	tupleData = fmt.Sprintf(formatter,
+		fmt.Sprintf("%s:%d", addrToStr(tpl.L3Proto, tpl.Saddr), byteorder.NetworkToHost16(tpl.Sport)),
+		fmt.Sprintf("%s:%d", addrToStr(tpl.L3Proto, tpl.Daddr), byteorder.NetworkToHost16(tpl.Dport)),
 		l4Info)
 	return tupleData
 }
@@ -422,6 +423,11 @@ var (
 	maxFuncLengthSeen  int
 )
 
+func fprintWithMinPadding(writer *os.File, data string, minLen int) {
+	formatter := fmt.Sprintf(" %%-%ds", minLen)
+	fmt.Fprintf(writer, formatter, data)
+}
+
 func fprintWithPadding(writer *os.File, data string, maxLenSeen *int) {
 	if len(data) > *maxLenSeen {
 		*maxLenSeen = len(data)
@@ -459,7 +465,7 @@ func (o *output) Print(event *Event) {
 	}
 
 	if o.flags.OutputTuple {
-		fprintWithPadding(o.writer, getTupleData(event, o.flags.OutputTCPFlags), &maxTupleLengthSeen)
+		fmt.Fprintf(o.writer, " %s", getTupleData(event, o.flags.OutputTCPFlags))
 	}
 
 	if o.flags.OutputCaller {

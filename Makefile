@@ -45,7 +45,7 @@ release:
 			make local-release"
 
 ## Build a new release
-local-release: clean
+local-release:
 	ARCHS='$(ARCHS)' ./local-release.sh
 
 ## Install the GO Binary to the location specified by 'BINDIR'

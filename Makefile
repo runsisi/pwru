@@ -24,7 +24,7 @@ GO_IMAGE_SHA = sha256:a22b2e6c5e753345b9759fba9e5c1731ebe28af506745e98f406cc85d5
 pwru: libpcap/libpcap.a
 	TARGET_GOARCH=$(TARGET_GOARCH) $(GO_GENERATE)
 	CC=$(CC) GOARCH=$(TARGET_GOARCH) $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) \
-		-ldflags "-w -s \
+		-gcflags="all=-N -l" -ldflags "\
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
 
 ## Build libpcap for static linking

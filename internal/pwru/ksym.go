@@ -39,6 +39,9 @@ func (a *Addr2Name) findNearestSym(ip uint64) string {
 			j = h
 		}
 	}
+	if i == 0 {
+		return ""
+	}
 	return strings.Replace(a.Addr2NameSlice[i-1].name, "\t", "", -1)
 }
 

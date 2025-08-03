@@ -1,0 +1,3 @@
+[submodule "third/ebpf"]
+	path = third/ebpf
+	url = https://github.com/cilium/ebpf.git

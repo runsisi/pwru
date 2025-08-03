@@ -13,7 +13,7 @@ for ARCH in ${ARCHS}; do
         CC=x86_64-linux-gnu-gcc
     fi
 
-    make clean
+#    make clean
     echo "Building release binary for ${OS}/${ARCH}..."
     make pwru TARGET_GOARCH=${ARCH} LIBPCAP_ARCH=${LIBPCAP_ARCH} CC=${CC} 
 

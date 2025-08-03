@@ -20,7 +20,7 @@ TEST_TIMEOUT ?= 5s
 pwru: libpcap/libpcap.a
 	TARGET_GOARCH=$(TARGET_GOARCH) $(GO_GENERATE)
 	CC=$(CC) GOARCH=$(TARGET_GOARCH) $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) \
-		-ldflags "-w -s \
+		-gcflags="all=-N -l" -ldflags "\
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
 
 ## Build libpcap for static linking

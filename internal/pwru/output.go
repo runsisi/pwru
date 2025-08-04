@@ -279,6 +279,15 @@ func getExecName(pid int) string {
 }
 
 func getTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
+	if tpl.L3Proto == syscall.ETH_P_ARP {
+		formatter := fmt.Sprintf(" %%-%ds %%-%ds(%%s)", len("255.255.255.255(aa:aa:aa:aa:aa:aa)"), len("255.255.255.255(aa:aa:aa:aa:aa:aa)"))
+		tupleData = fmt.Sprintf(formatter,
+			fmt.Sprintf("%s(%s)", addrToStr(syscall.ETH_P_IP, tpl.Saddr), macAddrToStr(tpl.Shwaddr)),
+			fmt.Sprintf("%s(%s)", addrToStr(syscall.ETH_P_IP, tpl.Daddr), macAddrToStr(tpl.Dhwaddr)),
+			arpOpToStr(tpl.ArpOp))
+		return tupleData
+	}
+
 	var l4Info string
 	if tpl.L4Proto == syscall.IPPROTO_TCP && tpl.TCPFlag != 0 && outputTCPFlags {
 		l4Info = fmt.Sprintf("%s:%s", protoToStr(tpl.L4Proto), tpl.TCPFlag)
@@ -499,6 +508,22 @@ func (o *output) getIfaceName(netnsInode, ifindex uint32) string {
 		}
 	}
 	return fmt.Sprintf("%d", ifindex)
+}
+
+func macAddrToStr(mac [6]byte) string {
+	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5])
+}
+
+func arpOpToStr(op uint16) string {
+	switch op {
+	case 1:
+		return "arp/request"
+	case 2:
+		return "arp/reply"
+	default:
+		return ""
+	}
 }
 
 func protoToStr(proto uint8) string {

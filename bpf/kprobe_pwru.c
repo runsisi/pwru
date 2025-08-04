@@ -13,6 +13,12 @@
 #define PRINT_SKB_STR_SIZE    (PERCPU_BIG_BUFF_SIZE - sizeof(u32))
 #define PRINT_SHINFO_STR_SIZE (PERCPU_BIG_BUFF_SIZE - sizeof(u32))
 
+#define ETH_P_ARP             0x0806
+#define ETH_ALEN              6
+#define ARPHRD_ETHER          1
+#define ARPOP_REQUEST         1
+#define ARPOP_REPLY           2
+
 #define ETH_P_IP              0x800
 #define ETH_P_IPV6            0x86dd
 #define ETH_P_8021Q           0x8100
@@ -59,6 +65,9 @@ struct skb_meta {
 } __attribute__((packed));
 
 struct tuple {
+	u8 shwaddr[ETH_ALEN];
+	u8 dhwaddr[ETH_ALEN];
+	u16 arp_op;
 	union addr saddr;
 	union addr daddr;
 	u16 sport;
@@ -353,8 +362,38 @@ set_meta(struct sk_buff *skb, struct skb_meta *meta) {
 }
 
 static __always_inline void
-__set_tuple(struct tuple *tpl, void *data, u16 l3_off, bool is_ipv4) {
+__set_tuple(struct tuple *tpl, void *data, u16 l3_proto, u16 l3_off, bool is_ipv4) {
 	u16 l4_off;
+
+	if (l3_proto == bpf_ntohs(ETH_P_ARP)) {
+		struct arphdr *arphdr = (struct arphdr *) (data + l3_off);
+		u16 ar_hrd = BPF_CORE_READ(arphdr, ar_hrd);
+		u16 ar_pro = BPF_CORE_READ(arphdr, ar_pro);
+		if (ar_hrd != bpf_htons(ARPHRD_ETHER) || ar_pro != bpf_htons(ETH_P_IP)) {
+			return;
+		}
+
+		u8 ar_hln = BPF_CORE_READ(arphdr, ar_hln);
+		u8 ar_pln = BPF_CORE_READ(arphdr, ar_pln);
+		if (ar_hln != ETH_ALEN || ar_pln != 4) {
+			return;
+		}
+
+		u16 ar_op = BPF_CORE_READ(arphdr, ar_op);
+		if (ar_op != bpf_htons(ARPOP_REPLY) && ar_op != bpf_htons(ARPOP_REQUEST)) {
+			return;
+		}
+
+		unsigned char *arp = (unsigned char *)(arphdr + 1);
+		bpf_probe_read_kernel(&tpl->shwaddr, ETH_ALEN, arp);
+		bpf_probe_read_kernel(&tpl->saddr, 4, arp + ETH_ALEN);
+		bpf_probe_read_kernel(&tpl->dhwaddr, ETH_ALEN, arp + ETH_ALEN + 4);
+		bpf_probe_read_kernel(&tpl->daddr, 4, arp + ETH_ALEN + 4 + ETH_ALEN);
+
+		tpl->arp_op = bpf_ntohs(ar_op);
+		tpl->l3_proto = ETH_P_ARP;
+		return;
+	}
 
 	if (is_ipv4) {
 		struct iphdr *ip4 = (struct iphdr *) (data + l3_off);
@@ -388,19 +427,24 @@ __set_tuple(struct tuple *tpl, void *data, u16 l3_off, bool is_ipv4) {
 static __always_inline void
 set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	void *skb_head = BPF_CORE_READ(skb, head);
+	u16 l3_proto = BPF_CORE_READ(skb, protocol);
 	u16 l3_off = BPF_CORE_READ(skb, network_header);
 
-	if (BPF_CORE_READ(skb, protocol) == bpf_ntohs(ETH_P_8021Q))
+	if (BPF_CORE_READ(skb, protocol) == bpf_ntohs(ETH_P_8021Q)) {
+		struct vlan_hdr *vlan = (struct vlan_hdr *) (skb_head + l3_off);
+		l3_proto = BPF_CORE_READ(vlan, h_vlan_encapsulated_proto);
+
 		l3_off += sizeof(struct vlan_hdr);
+	}
 
 	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
 	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
 
-	if (ip_vsn !=4 && ip_vsn != 6)
+	if (l3_proto != bpf_ntohs(ETH_P_ARP) && ip_vsn !=4 && ip_vsn != 6)
 		return;
 
 	bool is_ipv4 = ip_vsn == 4;
-	__set_tuple(tpl, skb_head, l3_off, is_ipv4);
+	__set_tuple(tpl, skb_head, l3_proto, l3_off, is_ipv4);
 }
 
 static __always_inline void
@@ -413,7 +457,7 @@ set_tunnel(struct sk_buff *skb, struct tuple *tpl, struct tuple *tunnel_tpl) {
 	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + tunnel_l3_off);
 	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
 	bool is_ipv4 = ip_vsn == 4;
-	__set_tuple(tunnel_tpl, skb_head, tunnel_l3_off, is_ipv4);
+	__set_tuple(tunnel_tpl, skb_head, bpf_ntohs(ETH_P_IP), tunnel_l3_off, is_ipv4);
 }
 
 static __always_inline u64
@@ -949,7 +993,7 @@ set_xdp_tuple(struct xdp_buff *xdp, struct tuple *tpl) {
 		return;
 
 	bool is_ipv4 = proto == bpf_htons(ETH_P_IP);
-	__set_tuple(tpl, data, l3_off, is_ipv4);
+	__set_tuple(tpl, data, proto, l3_off, is_ipv4);
 }
 
 static __always_inline void

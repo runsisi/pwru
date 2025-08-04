@@ -164,6 +164,9 @@ func (f tcpFlag) String() string {
 }
 
 type Tuple struct {
+	Shwaddr [6]byte
+	Dhwaddr [6]byte
+	ArpOp   uint16
 	Saddr   [16]byte
 	Daddr   [16]byte
 	Sport   uint16

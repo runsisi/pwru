@@ -46,6 +46,9 @@ type Flags struct {
 	FilterXdpExpr           string
 
 	OutputTS         string
+	OutputMiniMeta   bool
+	OutputSkbAddr    bool
+	OutputNetns      bool
 	OutputMeta       bool
 	OutputTuple      bool
 	OutputSkb        bool
@@ -95,7 +98,10 @@ func (f *Flags) SetFlags() {
 	flag.StringVar(&f.FilterSkbExpr, "filter-skb-expr", "", "filter skb with simple C expression, like 'skb->protocol == 0x0800'")
 	flag.StringVar(&f.FilterXdpExpr, "filter-xdp-expr", "", "filter xdp with simple C expression, like 'xdp->rxq->dev->ifindex == 9'")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
-	flag.BoolVar(&f.OutputMeta, "output-meta", true, "print skb metadata")
+	flag.BoolVar(&f.OutputMiniMeta, "output-mini-meta", true, "print minimized skb metadata")
+	flag.BoolVar(&f.OutputSkbAddr, "output-skb-addr", false, "print skb address")
+	flag.BoolVar(&f.OutputNetns, "output-netns", false, "print netns")
+	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", true, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputShinfo, "output-skb-shared-info", false, "print skb shared info")
@@ -135,6 +141,9 @@ func (f *Flags) Parse() {
 	f.FilterPcap = strings.Join(flag.Args(), " ")
 	if len(f.FilterNonSkbFuncs) > 0 || f.FilterTrackBpfHelpers {
 		f.FilterTrackSkbByStackid = true
+	}
+	if f.OutputMeta {
+		f.OutputMiniMeta = false
 	}
 }
 

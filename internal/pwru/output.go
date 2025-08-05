@@ -109,7 +109,7 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Ma
 	}
 
 	var ifs map[uint64]map[uint32]string
-	if flags.OutputMeta {
+	if flags.OutputMeta || flags.OutputMiniMeta {
 		ifs, err = getIfaces()
 		if err != nil {
 			log.Printf("Failed to retrieve all ifaces from all network namespaces: %v. Some iface names might be not shown.", err)
@@ -143,11 +143,23 @@ func (o *output) PrintHeader() {
 	if o.flags.OutputTS == "absolute" {
 		fmt.Fprintf(o.writer, "%-12s ", "TIME")
 	}
-	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", "SKB", "CPU", "PROCESS")
+
+	if o.flags.OutputMiniMeta {
+		if o.flags.OutputSkbAddr {
+			fmt.Fprintf(o.writer, "%-18s", "SKB")
+		}
+	} else {
+		fmt.Fprintf(o.writer, "%-18s %-3s %-16s", "SKB", "CPU", "PROCESS")
+	}
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %-16s", "TIMESTAMP")
 	}
-	if o.flags.OutputMeta {
+	if o.flags.OutputMiniMeta {
+		if o.flags.OutputNetns {
+			fmt.Fprintf(o.writer, " %-10s", "NETNS")
+		}
+		fmt.Fprintf(o.writer, " %16s", centerAlignString("IFACE", 16))
+	} else if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %-10s %-8s %16s %-6s %-5s %-5s", "NETNS", "MARK/x", centerAlignString("IFACE", 16), "PROTO", "MTU", "LEN")
 		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
 			fmt.Fprintf(o.writer, " %-56s", "__sk_buff->cb[]")
@@ -450,14 +462,25 @@ func (o *output) Print(event *Event) {
 
 	outFuncName := getOutFuncName(o, event, event.Addr)
 
-	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SkbAddr),
-		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("%s", execName))
+	if o.flags.OutputMiniMeta {
+		if o.flags.OutputSkbAddr {
+			fmt.Fprintf(o.writer, "%-18s", fmt.Sprintf("%#x", event.SkbAddr))
+		}
+	} else {
+		fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SkbAddr),
+			fmt.Sprintf("%d", event.CPU), fmt.Sprintf("%s", execName))
+	}
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %-16d", ts)
 	}
 	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
 
-	if o.flags.OutputMeta {
+	if o.flags.OutputMiniMeta {
+		if o.flags.OutputNetns {
+			fmt.Fprintf(o.writer, " %-10s", fmt.Sprintf("%d", event.Meta.Netns))
+		}
+		fmt.Fprintf(o.writer, " %16s", centerAlignString(o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex), 16))
+	} else if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %s", getMetaData(event, o))
 		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
 			fmt.Fprintf(o.writer, " %s", getCb(event))

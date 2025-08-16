@@ -151,7 +151,7 @@ func (o *output) PrintHeader() {
 	} else {
 		fmt.Fprintf(o.writer, "%-18s %-3s %-16s", "SKB", "CPU", "PROCESS")
 	}
-	if o.flags.OutputTS != "none" {
+	if o.flags.OutputTS != "none" && o.flags.OutputTS != "absolute" {
 		fmt.Fprintf(o.writer, " %-16s", "TIMESTAMP")
 	}
 	if o.flags.OutputMiniMeta {
@@ -470,7 +470,7 @@ func (o *output) Print(event *Event) {
 		fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SkbAddr),
 			fmt.Sprintf("%d", event.CPU), fmt.Sprintf("%s", execName))
 	}
-	if o.flags.OutputTS != "none" {
+	if o.flags.OutputTS != "none" && o.flags.OutputTS != "absolute" {
 		fmt.Fprintf(o.writer, " %-16d", ts)
 	}
 	o.lastSeenSkb[event.SkbAddr] = event.Timestamp

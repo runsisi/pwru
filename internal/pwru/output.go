@@ -292,12 +292,17 @@ func getExecName(pid int) string {
 
 func getTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
 	if tpl.L3Proto == syscall.ETH_P_ARP {
-		formatter := fmt.Sprintf(" %%-%ds %%-%ds(%%s)", len("255.255.255.255(aa:aa:aa:aa:aa:aa)"), len("255.255.255.255(aa:aa:aa:aa:aa:aa)"))
+		formatter := fmt.Sprintf("%%-%ds %%-%ds %%-%ds", len("255.255.255.255(aa:aa:aa:aa:aa:aa)"), len("255.255.255.255(aa:aa:aa:aa:aa:aa)"), len("arp:REQUEST"))
 		tupleData = fmt.Sprintf(formatter,
 			fmt.Sprintf("%s(%s)", addrToStr(syscall.ETH_P_IP, tpl.Saddr), macAddrToStr(tpl.Shwaddr)),
 			fmt.Sprintf("%s(%s)", addrToStr(syscall.ETH_P_IP, tpl.Daddr), macAddrToStr(tpl.Dhwaddr)),
 			arpOpToStr(tpl.ArpOp))
 		return tupleData
+	}
+
+	hasPort := false
+	if tpl.L4Proto == syscall.IPPROTO_TCP || tpl.L4Proto == syscall.IPPROTO_UDP {
+		hasPort = true
 	}
 
 	var l4Info string
@@ -307,10 +312,19 @@ func getTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
 		l4Info = protoToStr(tpl.L4Proto)
 	}
 
-	formatter := fmt.Sprintf(" %%-%ds %%-%ds(%%s)", len("255.255.255.255:65535"), len("255.255.255.255:65535"))
+	if !hasPort {
+		formatter := fmt.Sprintf("%%-%ds %%-%ds %%-%ds", len("255.255.255.255(aa:aa:aa:aa:aa:aa)"), len("255.255.255.255(aa:aa:aa:aa:aa:aa)"), len("tcp:FIN|PSH|ACK"))
+		tupleData = fmt.Sprintf(formatter,
+			fmt.Sprintf("%s(%s)", addrToStr(tpl.L3Proto, tpl.Saddr), macAddrToStr(tpl.Shwaddr)),
+			fmt.Sprintf("%s(%s)", addrToStr(tpl.L3Proto, tpl.Daddr), macAddrToStr(tpl.Dhwaddr)),
+			l4Info)
+		return tupleData
+	}
+
+	formatter := fmt.Sprintf("%%-%ds %%-%ds %%-%ds", len("255.255.255.255:65535(aa:aa:aa:aa:aa:aa)"), len("255.255.255.255:65535(aa:aa:aa:aa:aa:aa)"), len("tcp:FIN|PSH|ACK"))
 	tupleData = fmt.Sprintf(formatter,
-		fmt.Sprintf("%s:%d", addrToStr(tpl.L3Proto, tpl.Saddr), byteorder.NetworkToHost16(tpl.Sport)),
-		fmt.Sprintf("%s:%d", addrToStr(tpl.L3Proto, tpl.Daddr), byteorder.NetworkToHost16(tpl.Dport)),
+		fmt.Sprintf("%s:%d(%s)", addrToStr(tpl.L3Proto, tpl.Saddr), byteorder.NetworkToHost16(tpl.Sport), macAddrToStr(tpl.Shwaddr)),
+		fmt.Sprintf("%s:%d(%s)", addrToStr(tpl.L3Proto, tpl.Daddr), byteorder.NetworkToHost16(tpl.Dport), macAddrToStr(tpl.Dhwaddr)),
 		l4Info)
 	return tupleData
 }
@@ -449,6 +463,11 @@ func fprintWithPadding(writer *os.File, data string, maxLenSeen *int) {
 }
 
 func (o *output) Print(event *Event) {
+	tpl := event.Tuple
+	if tpl.L3Proto != syscall.ETH_P_ARP && tpl.L3Proto != syscall.ETH_P_IP && tpl.L3Proto != syscall.ETH_P_IPV6 {
+		return
+	}
+
 	if o.flags.OutputTS == "absolute" {
 		fmt.Fprintf(o.writer, "%-12s ", getAbsoluteTs())
 	}
@@ -547,9 +566,9 @@ func macAddrToStr(mac [6]byte) string {
 func arpOpToStr(op uint16) string {
 	switch op {
 	case 1:
-		return "arp/request"
+		return "arp/REQUEST"
 	case 2:
-		return "arp/reply"
+		return "arp/REPLY"
 	default:
 		return ""
 	}

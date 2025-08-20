@@ -437,13 +437,15 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 		l3_off += sizeof(struct vlan_hdr);
 	}
 
+	if (l3_proto != bpf_ntohs(ETH_P_ARP) &&
+			l3_proto != bpf_ntohs(ETH_P_IP) &&
+			l3_proto != bpf_ntohs(ETH_P_IPV6))
+		return;
+
 	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
 	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
 
-	if (l3_proto != bpf_ntohs(ETH_P_ARP) && ip_vsn !=4 && ip_vsn != 6)
-		return;
-
-	bool is_ipv4 = ip_vsn == 4;
+	bool is_ipv4 = (l3_proto == bpf_ntohs(ETH_P_IP)) && ip_vsn == 4;
 	__set_tuple(tpl, skb_head, l3_proto, l3_off, is_ipv4);
 }
 

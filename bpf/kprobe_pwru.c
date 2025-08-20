@@ -385,9 +385,9 @@ __set_tuple(struct tuple *tpl, void *data, u16 l3_proto, u16 l3_off, bool is_ipv
 		}
 
 		unsigned char *arp = (unsigned char *)(arphdr + 1);
-		bpf_probe_read_kernel(&tpl->shwaddr, ETH_ALEN, arp);
+		// bpf_probe_read_kernel(&tpl->shwaddr, ETH_ALEN, arp);
 		bpf_probe_read_kernel(&tpl->saddr, 4, arp + ETH_ALEN);
-		bpf_probe_read_kernel(&tpl->dhwaddr, ETH_ALEN, arp + ETH_ALEN + 4);
+		// bpf_probe_read_kernel(&tpl->dhwaddr, ETH_ALEN, arp + ETH_ALEN + 4);
 		bpf_probe_read_kernel(&tpl->daddr, 4, arp + ETH_ALEN + 4 + ETH_ALEN);
 
 		tpl->arp_op = bpf_ntohs(ar_op);
@@ -441,6 +441,12 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 			l3_proto != bpf_ntohs(ETH_P_IP) &&
 			l3_proto != bpf_ntohs(ETH_P_IPV6))
 		return;
+
+	u16 l2_off = BPF_CORE_READ(skb, mac_header);
+	struct ethhdr *l2_hdr = (struct ethhdr *) (skb_head + l2_off);
+
+	bpf_probe_read_kernel(&tpl->shwaddr, ETH_ALEN, l2_hdr->h_source);
+	bpf_probe_read_kernel(&tpl->dhwaddr, ETH_ALEN, l2_hdr->h_dest);
 
 	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
 	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);

@@ -110,7 +110,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputCaller, "output-caller", false, "print caller function name")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 	flag.BoolVar(&f.OutputSkbCB, "output-skb-cb", false, "print skb->cb")
-	flag.BoolVar(&f.OutputTCPFlags, "output-tcp-flags", false, "print TCP flags")
+	flag.BoolVar(&f.OutputTCPFlags, "output-tcp-flags", true, "print TCP flags")
 	flag.StringSliceVar(&f.OutputSkbMetadata, "output-skb-metadata", nil, fmt.Sprintf("print skb metadata (e.g., \"skb->mark\", \"skb->hash\"), %d at most", maxSkbMetadata))
 	flag.StringSliceVar(&f.OutputXdpMetadata, "output-xdp-metadata", nil, fmt.Sprintf("print xdp metadata (e.g., \"xdp->rxq->queue_index\"), %d at most", maxSkbMetadata))
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")

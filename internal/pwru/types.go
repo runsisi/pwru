@@ -97,7 +97,7 @@ func (f *Flags) SetFlags() {
 	flag.UintVar(&f.FilterKprobeBatch, "filter-kprobe-batch", 10, "batch size for kprobe attaching/detaching")
 	flag.StringVar(&f.FilterSkbExpr, "filter-skb-expr", "", "filter skb with simple C expression, like 'skb->protocol == 0x0800'")
 	flag.StringVar(&f.FilterXdpExpr, "filter-xdp-expr", "", "filter xdp with simple C expression, like 'xdp->rxq->dev->ifindex == 9'")
-	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
+	flag.StringVar(&f.OutputTS, "timestamp", "absolute", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
 	flag.BoolVar(&f.OutputMiniMeta, "output-mini-meta", true, "print minimized skb metadata")
 	flag.BoolVar(&f.OutputSkbAddr, "output-skb-addr", false, "print skb address")
 	flag.BoolVar(&f.OutputNetns, "output-netns", false, "print netns")
